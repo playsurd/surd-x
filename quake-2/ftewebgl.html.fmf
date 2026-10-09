@@ -1,0 +1,47 @@
+game q2
+name "Quake 2 (FTE)"
+basegame baseq2
+basegame *fte
+
+bind w +forward
+bind s +back
+bind a +moveleft
+bind d +moveright
+bind mouse1 +attack
+bind mouse2 +moveup
+bind q "use grapple"
+bind tab "score"
+set cl_run 1
+set sensitivity 6
+set vid_fullscreen 0
+set r_waterstyle 1
+set r_telestyle 1
+set r_refraction_fbo 0
+
+// --- gamepad (consistent layout across pieter games) ---
+set in_joystick 1
+// left stick = move
+bind GP_LTHUMB_UP +forward
+bind GP_LTHUMB_DOWN +back
+bind GP_LTHUMB_LEFT +moveleft
+bind GP_LTHUMB_RIGHT +moveright
+// right stick = turn / look
+bind GP_RTHUMB_LEFT +left
+bind GP_RTHUMB_RIGHT +right
+bind GP_RTHUMB_UP +lookup
+bind GP_RTHUMB_DOWN +lookdown
+bind GP_RTRIGGER +attack
+bind GP_LTRIGGER +speed
+bind GP_A +moveup
+bind GP_B +movedown
+bind GP_X "use grapple"
+bind GP_Y +use
+bind GP_LSHOULDER weapprev
+bind GP_RSHOULDER weapnext
+bind GP_LTHUMB +speed
+bind GP_START togglemenu
+bind GP_BACK "score"
+
+package baseq2/pak0.pak - "fteassets/baseq2/pak0.pak"
+package baseq2/q2extras2.pk3 - "fteassets/baseq2/q2extras2.pk3"
+package baseq2/q2dm.pk3 - "fteassets/baseq2/q2dm.pk3"

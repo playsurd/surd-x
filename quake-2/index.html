@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+<base href="https://cdn.jsdelivr.net/gh/playsurd/surd-x@main/quake-2/">
+<script data-surd="1">(function () {
+  var W = window;
+  var unityTarget = null;
+  function tellUnity(methods, arg) {
+    var inst = W.__surdUnity || W.unityInstance || W.gameInstance;
+    if (!inst || !inst.SendMessage || !unityTarget) return;
+    for (var i = 0; i < methods.length; i++) {
+      try { arg === undefined ? inst.SendMessage(unityTarget, methods[i]) : inst.SendMessage(unityTarget, methods[i], arg); }
+      catch (e) {  }
+    }
+  }
+  if (typeof W.initPokiBridge !== 'function') {
+    W.initPokiBridge = function (name) { unityTarget = name || unityTarget; };
+  }
+  if (typeof W.commercialBreak !== 'function') {
+    W.commercialBreak = function () { setTimeout(function () { tellUnity(['CommercialBreakComplete', 'commercialBreakComplete']); }, 0); };
+  }
+  if (typeof W.rewardedBreak !== 'function') {
+    W.rewardedBreak = function () { setTimeout(function () { tellUnity(['RewardedBreakComplete', 'rewardedBreakComplete'], 'false'); }, 0); };
+  }
+  var resolved = function () { return Promise.resolve(); };
+  if (!W.PokiSDK) {
+    W.PokiSDK = {
+      init: resolved, initPokiBridge: function () {}, setDebug: function () {},
+      gameLoadingStart: function () {}, gameLoadingFinished: function () {},
+      gameLoadingProgress: function () {},
+      gameplayStart: function () {}, gameplayStop: function () {},
+      commercialBreak: resolved, rewardedBreak: function () { return Promise.resolve(false); },
+      happyTime: function () {}, customEvent: function () {}, captureError: function () {},
+      isAdBlocked: function () { return false; }, shareableURL: function () { return Promise.resolve(location.href); },
+      getURLParam: function (k) { try { return new URL(location.href).searchParams.get(k) || ''; } catch (e) { return ''; } },
+    };
+  }
+  if (!W.YaGames) {
+    var yPlayer = {
+      getName: function () { return 'player'; }, getUniqueID: function () { return 'local'; },
+      getData: function () { return Promise.resolve({}); }, setData: resolved,
+      getStats: function () { return Promise.resolve({}); }, setStats: resolved, incrementStats: resolved,
+      getMode: function () { return 'lite'; }, getPhoto: function () { return ''; },
+    };
+    var yLeaderboards = {
+      setLeaderboardScore: resolved,
+      getLeaderboardEntries: function () { return Promise.resolve({ entries: [] }); },
+      getLeaderboardPlayerEntry: function () { return Promise.reject(new Error('no entry')); },
+      getLeaderboardDescription: function () { return Promise.resolve({}); },
+    };
+    var ySdk = {
+      adv: {
+        showFullscreenAdv: function (o) { var c = o && o.callbacks; if (c && c.onClose) setTimeout(function () { c.onClose(false); }, 0); },
+        showRewardedVideo: function (o) { var c = o && o.callbacks; if (c && c.onClose) setTimeout(function () { c.onClose(); }, 0); },
+        getBannerAdvStatus: function () { return Promise.resolve({ stickyAdvIsShowing: false }); },
+      },
+      getPlayer: function () { return Promise.resolve(yPlayer); },
+      getPayments: function () { return Promise.resolve({
+        getCatalog: function () { return Promise.resolve([]); },
+        getPurchases: function () { return Promise.resolve([]); },
+        purchase: function () { return Promise.reject(new Error('payments unavailable')); },
+        consumePurchase: resolved,
+      }); },
+      getFlags: function () { return Promise.resolve({}); },
+      getStorage: function () { return Promise.resolve(window.localStorage); },
+      clipboard: { writeText: resolved },
+      shortcut: { canShowPrompt: function () { return Promise.resolve({ canShow: false }); }, showPrompt: function () { return Promise.resolve({ outcome: 'rejected' }); } },
+      feedback: { canReview: function () { return Promise.resolve({ value: false }); }, requestReview: function () { return Promise.resolve({ feedbackSent: false }); } },
+      getLeaderboards: function () { return Promise.resolve(yLeaderboards); },
+      features: { LoadingAPI: { ready: function () {} } },
+      screen: { fullscreen: { request: resolved, exit: resolved } },
+      isAvailableMethod: function () { return Promise.resolve(false); },
+      environment: { i18n: { lang: 'en' }, app: { id: 'local' } },
+      deviceInfo: { isDesktop: function () { return true; }, isMobile: function () { return false; },
+                    isTablet: function () { return false; }, isTV: function () { return false; },
+                    type: 'desktop' },
+    };
+    W.YaGames = { init: function () { return Promise.resolve(ySdk); } };
+    W.ysdk = ySdk;
+  }
+  if (!W.ytgame) {
+    var ytNoop = function () {};
+    W.ytgame = {
+      IN_PLAYABLES_ENV: false,
+      game: { firstFrameReady: ytNoop, gameReady: ytNoop, loadData: function () { return Promise.resolve(''); },
+              saveData: function () { return Promise.resolve(); }, isPaused: function () { return false; } },
+      system: { getLanguage: function () { return 'en'; }, isAudioEnabled: function () { return true; },
+                onAudioEnabledChange: ytNoop, onPause: ytNoop, onResume: ytNoop },
+      health: { logError: ytNoop, logWarning: ytNoop },
+      engagement: { sendScore: function () { return Promise.resolve(); } },
+      ads: { requestInterstitialAd: function () { return Promise.resolve(); } },
+    };
+  }
+  if (typeof document !== 'undefined' && document.xURL === undefined) {
+    try { document.xURL = 'https://poki.com/'; } catch (e) {  }
+  }
+  if (!W.YYGGames) {
+    var yyAds = function (o) {
+      o = o || {};
+      var step = function (fn) { if (typeof fn === 'function') setTimeout(fn, 0); };
+      step(o.beforeShowAd);
+      setTimeout(function () { step(o.afterShowAd); step(o.rewardDismissed); }, 1);
+    };
+    W.YYGGames = {
+      startup: function (o) { if (o && typeof o.complete === 'function') setTimeout(o.complete, 0); },
+      startupByYad: function () {}, showSplash: function () {},
+      showInterstitial: yyAds, showReward: yyAds,
+      canShowReward: function () { return false; },
+      getAdPlatformType: function () { return 'none'; },
+      getForgames: function () { return Promise.resolve([]); },
+      navigate: function () {},
+      onVisibilitychange: function () {},
+    };
+  }
+  if (!W.GamePix) {
+    W.GamePix = { init: function () {}, ping: function () {}, gameLoadingStart: function () {}, gameLoadingFinished: function () {},
+                  interstitialAd: resolved, rewardAd: function () { return Promise.resolve(false); }, happyMoment: function () {} };
+  }
+  if (!W.CrazyGames) {
+    var noop = function () {};
+    W.CrazyGames = { SDK: {
+      init: resolved, game: { gameplayStart: noop, gameplayStop: noop, loadingStart: noop, loadingStop: noop, happytime: noop },
+      ad: { requestAd: function (t, cb) { if (cb && cb.adFinished) cb.adFinished(); }, hasAdblock: function () { return Promise.resolve(false); } },
+      user: { getUser: function () { return Promise.resolve(null); } },
+      banner: { requestBanner: resolved, clearAllBanners: noop },
+    } };
+  }
+})();
+if (typeof window !== 'undefined') {
+  if (typeof window.environmentData === 'undefined') window.environmentData = 'NO_DATA';
+  if (typeof window.nowFullAdOpen === 'undefined') window.nowFullAdOpen = false;
+}
+try {
+  var parentWin = window.parent;
+  if (parentWin && parentWin !== window) {
+    if (typeof parentWin.maeExportApis_ !== 'function') parentWin.maeExportApis_ = function () {};
+  }
+} catch (e) {  }
+if(typeof window.UnityProgress!=="function")window.UnityProgress=function(){this.SetMessage=function(){};this.SetProgress=function(){};this.Clear=function(){};};
+window.alert=function(){};window.confirm=function(){return false;};window.prompt=function(){return null;};
+(function(){
+    /* DEAD HOSTS, blocked for a different reason than the ad networks below.
+     *
+     * Sixteen files across the catalogue live on hosts that no longer answer. Vendoring could not
+     * save them (nothing to download, and none are in the Wayback Machine), but every one turned
+     * out to be inessential once looked at: an ad SWF (bbplayer), a portal logo (kizi), portal
+     * SDKs (gamemix, gmsdk), a sitelock check (pegasgames' "wheely7sec.swf" — wheely-7 ships its
+     * real game in _vendor), cosmetic images, and duplicates of files the game already has
+     * locally (both spongebob ports ship their own flambe.js). Left alone, each one is a request
+     * that hangs until it times out; blocked, it fails instantly and the game gets on with it. */
+    var DEAD = /(bbplayer\.net|cdn0\.kizi\.com|gmapi\.gamemix\.com|r3tq6l1\/gmsdk|candystand\.com|eags\.us|iep-esy\.ir|pegasgames\.com|ngames365\.github\.io|yurivish\.com|chicken\.royalredeemerlutheranschool\.org|marketjs-us\/en\/patch|cdn\.jsdelivr\.net\/discount\.json)/i;
+    var BAD = /(doubleclick\.net|googlesyndication\.com|googleadservices\.com|googleads\.g\.doubleclick\.net|adtrafficquality\.google|2mdn\.net|imasdk\.googleapis\.com|adsbygoogle|google-analytics\.com|googletagmanager\.com|gstatic\.com\/firebasejs|gamemonetize\.com|fliplineads\.com|cpmstar\.com|ngads\.com|adinplay\.com|mochibot\.com|mochiads\.com|gamedistribution\.com|msgrt\.gamedistribution\.com|azerioncircle\.com|gamemonkey\.org|gameanalytics\.com|gamedock\.io|enjoy4fun\.com|gamebridge\.games|gamearter\.com|poki\.io|famobi\.com|softgames\.de|analytics\.shapez\.io|scorecardresearch\.com|moatads\.com|amazon-adsystem\.com|criteo|pubmatic|rubiconproject|adnxs\.com|casalemedia|smartadserver|taboola|outbrain|hotjar\.com|mixpanel|clarity\.ms|rudderlabs\.com|analytics\.tiktok\.com|connect\.facebook\.net|yandex\.ru\/metrika|mc\.yandex|cloud\.unity3d\.com|pushalert\.co|quizvana\.com|serviceclic\.com|atpnd\.com|r9x\.in|adsgram\.ai)/i;
+    function bad(u){ try { var t = String(u); return BAD.test(t) || DEAD.test(t); } catch(e){ return false; } }
+    /* HOST-ABSOLUTE PATHS: "/version.json", "/audio/x.flac".
+     *
+     * A leading slash ignores <base> completely and resolves against the ORIGIN, which for us
+     * is the site (or an opaque blob origin) and never holds game assets — so every such
+     * request is a guaranteed 404. 2048-merge-run asked for /version.json, /fileconfig.json
+     * and every one of its scene files this way and showed a black screen with nothing but
+     * "Script error." to go on; a-dark-room does the same with /audio/*.flac.
+     *
+     * Since no host-absolute path can ever be correct here, point them all at the game's own
+     * base. This is a rewrite rather than a refusal: the files exist, just one level up.
+     * Protocol-relative "//host/x" is a different thing (a real remote host) and is left to
+     * the denylist above. */
+    /* Read the base LAZILY. This guard is deliberately installed before the manifest script
+     * (that order is load-bearing — moving SURD_GAME ahead of the prelude once stopped this
+     * very game from rendering at all), so at install time there is no base to capture. */
+    function gbase(){ try { return (window.SURD_GAME && window.SURD_GAME.base) || ''; } catch(e){ return ''; } }
+    /* A file we downloaded from a third-party host and now ship ourselves. Checked before
+     * anything else: this is what stops a game depending on someone else's server staying up,
+     * and it works even when the game builds the URL at runtime. */
+    function vendored(u){
+      try {
+        var M = window.SURD_GAME, map = M && M.ext;
+        if (!map || typeof u !== 'string') return null;
+        var q = u.split('#')[0];
+        if (map[q]) return String(M.base).replace(/\/?$/, '/') + map[q];
+        var noq = q.split('?')[0];
+        if (map[noq]) return String(M.base).replace(/\/?$/, '/') + map[noq];
+        return null;
+      } catch(e){ return null; }
+    }
+    function rebase(u){
+      try {
+        if (typeof u !== 'string' || !u) return u;
+        var v = vendored(u); if (v) return v;
+        var B = gbase(); if (!B) return u;
+        B = B.replace(/\/?$/, '/');
+        if (u.indexOf(B) === 0) return u;                        // already where it belongs
+        /* Never touch OUR OWN plumbing. The runtime and its adapters live at a different path
+         * (and in production a different origin), and rebasing them points the loader at the
+         * game's asset directory, where no adapter exists. */
+        var RT = '';
+        try { RT = (window.SURD_GAME && window.SURD_GAME.runtime) || ''; } catch(e){}
+        if (RT && u.indexOf(RT) === 0) return u;
+        if (u.indexOf('/_rt/') >= 0 || u.indexOf('surd-runtime') >= 0) return u;
+        /* A bare "/" (or "/?x") has NO path to rebase, and rewriting it produced a request for
+         * the base DIRECTORY, which 404s and shows up in the log as
+         * "failed to load .../suika-game/". Leave those alone. */
+        if (u.charAt(0) === '/' && u.charAt(1) !== '/') {
+          var rest = u.slice(1);
+          return rest && rest.charAt(0) !== '?' && rest.charAt(0) !== '#' ? B + rest : u;
+        }
+        /* An engine that builds its own absolute URLs from location, rather than letting the
+         * browser resolve a relative path, lands on the SITE origin — which holds no game
+         * assets either. 2048-merge-run (LayaAir) asks for "<origin>/version.json" outright,
+         * so matching only a leading slash was not enough. Our origin is never a legitimate
+         * place for a game to fetch from, so the same redirect applies. */
+        var o = location.origin;
+        if (o && o !== 'null' && u.indexOf(o + '/') === 0) return B + u.slice(o.length + 1);
+        return u;
+      } catch(e){ return u; }
+    }
+    var of = window.fetch;
+    if (of) window.fetch = function(i, o){
+      var u = (i && i.url) ? i.url : i;
+      /* 204 forbids a body, and passing one throws in Firefox ("Response body is given with a
+       * null body status") — INSIDE the game's own fetch call, which is exactly what this branch
+       * exists to protect (papa-burgeria). Status 200 with an empty body is accepted everywhere
+       * and reads to the caller as "nothing here", which is what we want to say. */
+      if (bad(u)) return Promise.resolve(new Response('', {status:200}));
+      if (typeof i === 'string') { var r = rebase(i); if (r !== i) return of.call(this, r, o); }
+      return of.apply(this, arguments);
+    };
+    var oo = window.XMLHttpRequest && window.XMLHttpRequest.prototype.open;
+    if (oo) window.XMLHttpRequest.prototype.open = function(m, u){
+      if (bad(u)) { arguments[1] = 'data:text/plain,'; }
+      else if (typeof u === 'string') { arguments[1] = rebase(u); }
+      return oo.apply(this, arguments);
+    };
+    if (navigator.sendBeacon) { var ob = navigator.sendBeacon.bind(navigator);
+      navigator.sendBeacon = function(u, d){ return bad(u) ? true : ob(u, d); }; }
+    var OW = window.WebSocket;
+    if (OW) window.WebSocket = function(u, p){
+      if (bad(u)) u = 'ws://127.0.0.1:1';
+      return p === undefined ? new OW(u) : new OW(u, p);
+    };
+    /* setAttribute('src', …) bypasses the property setter patched below, and several ad
+     * tags use exactly that form (moto-x3m still reached googlesyndication until this). */
+    try {
+      var osa = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function(n, v){
+        if (n && /^(src|href|data)$/i.test(n)) {
+          if (bad(v)) return;
+          /* Same host-absolute problem, reached through an attribute: an <img> or <audio>
+           * given "/audio/x.flac" resolves against the origin and 404s. */
+          if (typeof v === 'string') arguments[1] = rebase(v);
+        }
+        return osa.apply(this, arguments);
+      };
+    } catch(e){}
+    /* Element src= is how most ad tags actually load. */
+    try {
+      ['HTMLImageElement','HTMLScriptElement','HTMLIFrameElement','HTMLAudioElement','HTMLVideoElement','HTMLSourceElement'].forEach(function(k){
+        var P = window[k] && window[k].prototype; if (!P) return;
+        var d = Object.getOwnPropertyDescriptor(P, 'src'); if (!d || !d.set) return;
+        Object.defineProperty(P, 'src', {
+          configurable: true, enumerable: d.enumerable, get: d.get,
+          set: function(v){
+            if (bad(v)) return;
+            var t = typeof v === 'string' ? rebase(v) : v;
+            /* CORS ON OUR OWN ASSETS — not politeness, a hard requirement.
+             *
+             * WebGL refuses to upload a texture from an image fetched cross-origin without
+             * CORS: the canvas would be tainted, so it throws "SecurityError: The operation is
+             * insecure" inside uploadTexture and the game shows a grey screen with everything
+             * apparently loaded (stair-race-3d, PlayCanvas). Our assets live on another origin
+             * by definition — the page is a blob, the files are on the CDN — so every engine
+             * that loads textures through <img> hits this.
+             *
+             * Scoped to OUR hosts and to relative URLs (which resolve against our base through
+             * <base>): jsDelivr and raw both send Access-Control-Allow-Origin: *, so requesting
+             * CORS always succeeds there. Setting it on a third-party host that does NOT send
+             * the header would turn a working image into a failed one, so those are left alone.
+             *
+             * Scripts get the same treatment for a different reason: without crossorigin an
+             * error inside an engine-injected script arrives as the bare, useless
+             * "Script error." with no file or line (2048-merge-run's laya.core.min.js). */
+            try {
+              var ours = typeof t === 'string' && (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(t)
+                || t.indexOf(gbase()) === 0
+                || /^https:\/\/(cdn\.jsdelivr\.net|raw\.githubusercontent\.com)\//.test(t));
+              if (ours && !this.crossOrigin) this.crossOrigin = 'anonymous';
+            } catch(e){}
+            return d.set.call(this, t);
+          }
+        });
+      });
+    } catch(e){}
+  })();</script>
+<script data-surd="1">window.SURD_GAME={"id":"quake-2","engine":"generic","base":"https://cdn.jsdelivr.net/gh/playsurd/surd-x@main/quake-2/","runtime":"https://cdn.jsdelivr.net/gh/playsurd/surd-runtime@main/v53aeb7210d/","files":{},"config":{},"split":[{"p":"fteassets/baseq2/pak0.pak","u":["fteassets/baseq2/pak0.pak.sp0","fteassets/baseq2/pak0.pak.sp1","fteassets/baseq2/pak0.pak.sp2"],"b":49951322,"m":"application/octet-stream","v":1,"pf":1},{"p":"fteassets/baseq2/q2extras2.pk3","u":["fteassets/baseq2/q2extras2.pk3"],"b":19510801,"m":"application/octet-stream","pf":1},{"p":"ftewebgl2.wasm","u":["ftewebgl2.wasm"],"b":6323928,"m":"application/wasm","pf":1},{"p":"fteassets/baseq2/q2dm.pk3","u":["fteassets/baseq2/q2dm.pk3"],"b":5433237,"m":"application/octet-stream","pf":1}]};</script>
+<script data-surd="1">(function () {
+  var M = window.SURD_GAME;
+  var table = M && M.split;
+  if (!table || !table.length) return;
+  var base = String(M.base || '').replace(/\/?$/, '/');
+  var byPath = {};
+  var i;
+  for (i = 0; i < table.length; i++) byPath[table[i].p] = table[i];
+  var blobs = {};
+  var urlOf = {};
+  var pending = {};
+  function partUrls(e) {
+    var out = [];
+    for (var k = 0; k < e.u.length; k++) out.push(base + e.u[k]);
+    return out;
+  }
+  function match(url) {
+    if (typeof url !== 'string') {
+      if (!url || typeof url.url !== 'string') return null;
+      url = url.url;
+    }
+    var q = url.split('#')[0].split('?')[0];
+    try { q = decodeURIComponent(q); } catch (e) {}
+    q = q.replace(/^\.\//, '');
+    try {
+      var ext = M && M.ext;
+      if (ext && ext[q]) q = ext[q];
+    } catch (e) {}
+    var hit = exact(q);
+    return hit || virtualPart(q);
+  }
+  function exact(q) {
+    for (var p in byPath) {
+      if (q === p || q === base + p) return byPath[p];
+      if (q.length > p.length && q.slice(-(p.length + 1)) === '/' + p) return byPath[p];
+    }
+    return null;
+  }
+  var firstIdx = {};
+  var EMPTY = { p: ' empty', u: [], b: 0, m: 'application/octet-stream' };
+  function virtualPart(q) {
+    var m = q.match(/^(.*)\.part(\d+)$/i);
+    if (!m) return null;
+    var e = exact(m[1]);
+    if (!e || !e.v) return null;
+    var n = +m[2];
+    if (!(e.p in firstIdx)) firstIdx[e.p] = n;
+    return n === firstIdx[e.p] ? e : EMPTY;
+  }
+  function finish(e, parts) {
+    var blob = new Blob(parts, { type: e.m || 'application/octet-stream' });
+    if (e.b && blob.size !== e.b) throw new Error('surd: ' + e.p + ' reassembled to ' + blob.size + ', expected ' + e.b);
+    var u = URL.createObjectURL(blob);
+    blobs[u] = blob; urlOf[e.p] = u;
+    return u;
+  }
+  function mirrorUrl(url) {
+    var m = /^https:\/\/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^@/]+)@([^/]+)\/(.*)$/.exec(url || '');
+    return m ? 'https://raw.githubusercontent.com/' + m[1] + '/' + m[2] + '/' + m[3] + '/' + m[4] : null;
+  }
+  var TRANSIENT = { 403: 1, 408: 1, 425: 1, 429: 1, 500: 1, 502: 1, 503: 1, 504: 1, 522: 1 };
+  function fetchPart(url, attempt) {
+    attempt = attempt || 1;
+    var alt = mirrorUrl(url);
+    var target = (alt && attempt % 2 === 0) ? alt : url;
+    return nativeFetch(target).then(function (r) {
+      if (r.ok) return r.blob();
+      var e = new Error('surd: ' + r.status + ' on ' + target);
+      e.status = r.status;
+      throw e;
+    })['catch'](function (err) {
+      var retryable = !err.status || TRANSIENT[err.status];
+      if (attempt >= 4 || (!retryable && attempt > 1)) throw err;
+      return new Promise(function (r) { setTimeout(r, Math.min(8000, 400 * attempt * attempt)); })
+        .then(function () { return fetchPart(url, attempt + 1); });
+    });
+  }
+  function assemble(e) {
+    if (urlOf[e.p]) return Promise.resolve(urlOf[e.p]);
+    if (pending[e.p]) return pending[e.p];
+    var urls = partUrls(e);
+    var got = new Array(urls.length);
+    var next = 0;
+    function lane() {
+      if (next >= urls.length) return Promise.resolve();
+      var n = next++;
+      return fetchPart(urls[n]).then(function (b) { got[n] = b; return lane(); });
+    }
+    var lanes = [];
+    for (var k = 0; k < Math.min(6, urls.length); k++) lanes.push(lane());
+    var p = Promise.all(lanes).then(function () { return finish(e, got); });
+    pending[e.p] = p;
+    return p;
+  }
+  function syncBytes(url) {
+    var x = new NativeXHR();
+    nativeOpen.call(x, 'GET', url, false);
+    if (x.overrideMimeType) x.overrideMimeType('text/plain; charset=x-user-defined');
+    nativeSend.call(x, null);
+    if (x.status && x.status !== 200 && x.status !== 0) throw new Error('surd: ' + x.status + ' on ' + url);
+    var s = x.responseText, n = s.length, a = new Uint8Array(n);
+    for (var k = 0; k < n; k++) a[k] = s.charCodeAt(k) & 0xff;
+    return a;
+  }
+  function assembleSync(e) {
+    if (urlOf[e.p]) return urlOf[e.p];
+    var urls = partUrls(e), got = [];
+    for (var k = 0; k < urls.length; k++) got.push(syncBytes(urls[k]));
+    var u = finish(e, got);
+    pending[e.p] = Promise.resolve(u);
+    return u;
+  }
+  var nativeFetch = window.fetch && window.fetch.bind(window);
+  if (nativeFetch) {
+    window.fetch = function (input, init) {
+      var e = match(typeof input === 'string' ? input : input);
+      if (!e) return nativeFetch(input, init);
+      if (init && init.method && String(init.method).toUpperCase() === 'HEAD') {
+        return Promise.resolve(new Response(null, { status: 200, headers: { 'Content-Length': String(e.b || 0) } }));
+      }
+      return assemble(e).then(function (u) { return nativeFetch(u); });
+    };
+  }
+  var NativeXHR = window.XMLHttpRequest;
+  var XP = NativeXHR.prototype;
+  var nativeOpen = XP.open, nativeSend = XP.send;
+  XP.open = function (method, url, async) {
+    var e = match(url);
+    this.__surdSplit = e || null;
+    if (e) {
+      this.__surdArgs = Array.prototype.slice.call(arguments);
+      this.__surdSync = async === false;
+      if (this.__surdSync) {
+        try { return nativeOpen.apply(this, [method, assembleSync(e), false].concat(Array.prototype.slice.call(arguments, 3))); }
+        catch (err) { this.__surdSplit = null; }
+      }
+    }
+    return nativeOpen.apply(this, arguments);
+  };
+  XP.send = function (body) {
+    var e = this.__surdSplit;
+    if (!e || this.__surdSync) return nativeSend.apply(this, arguments);
+    var self = this, args = this.__surdArgs;
+    assemble(e).then(function (u) {
+      args[1] = u;
+      nativeOpen.apply(self, args);
+      nativeSend.call(self, body);
+    })['catch'](function (err) {
+      try { if (self.onerror) self.onerror({ target: self, message: String(err && err.message || err) }); } catch (x) {}
+    });
+  };
+  function script(path) {
+    var e = byPath[path] || match(path);
+    if (!e) { throw new Error('surd: no split entry for script ' + path); }
+    var urls = partUrls(e), chunks = [], total = 0, k;
+    for (k = 0; k < urls.length; k++) { chunks.push(syncBytes(urls[k])); total += chunks[k].length; }
+    var all = new Uint8Array(total), at = 0;
+    for (k = 0; k < chunks.length; k++) { all.set(chunks[k], at); at += chunks[k].length; }
+    if (e.b && total !== e.b) throw new Error('surd: ' + e.p + ' reassembled to ' + total + ', expected ' + e.b);
+    var code = new TextDecoder('utf-8').decode(all);
+    (0, eval)(code + '\n//# sourceURL=' + base + e.p);
+  }
+  window.SURD_SPLIT = { blobs: blobs, match: match, assemble: assemble, script: script };
+  var pf = [];
+  for (i = 0; i < table.length; i++) if (table[i].pf) pf.push(table[i]);
+  if (pf.length) {
+    var st = { total: pf.length, done: 0, bytes: 0, doneBytes: 0, failed: 0 };
+    for (i = 0; i < pf.length; i++) st.bytes += pf[i].b || 0;
+    window.SURD_PREFETCH = st;
+    var next = 0, LANES = 2;
+    var pump = function () {
+      if (next >= pf.length) return;
+      var e = pf[next++];
+      assemble(e)['catch'](function () { st.failed++; })
+        .then(function () { st.done++; st.doneBytes += e.b || 0; pump(); });
+    };
+    for (i = 0; i < LANES && i < pf.length; i++) pump();
+  }
+})();</script>
+<script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/playsurd/surd-runtime@main/v53aeb7210d/runtime.js"></script>
+
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+	<title>Quake II</title>
+	<script>
+	// Keep our own page title even though the FTE engine tries to rewrite
+	// document.title at runtime (to the server name / map / "FTE QuakeWorld").
+	(function(){
+		var FIXED = "Quake II";
+		try {
+			Object.defineProperty(document, 'title', {
+				configurable: true,
+				get: function(){ return FIXED; },
+				set: function(){ /* ignore engine attempts to change it */ }
+			});
+		} catch(e){}
+		// Backstop: if anything writes the <title> element text directly,
+		// reset it. Guarded so we never loop on our own write.
+		function force(){
+			var t = document.getElementsByTagName('title')[0];
+			if (t && t.textContent !== FIXED) t.textContent = FIXED;
+		}
+		try {
+			var t = document.getElementsByTagName('title')[0];
+			if (t) new MutationObserver(force).observe(t, {childList:true});
+		} catch(e){}
+		document.addEventListener('DOMContentLoaded', force);
+	})();
+	</script>
+	<style>
+	#status{display:none!important;}   /* hide the "Downloading game files..." text (spinner still shows) */
+	html,body { background-color:#000000; color:#808080; height:100%;width:100%;margin:0;padding:0;}
+	.emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
+	div.emscripten { text-align: center; padding:0; margin: 0;}
+	/* the canvas *must not* have any border or padding, or mouse coords will be wrong */
+	canvas.emscripten { border: 0px none; width:100%; height:100%; padding:0; margin: 0;}
+	#spinner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;margin:0;display:flex;flex-direction:column;align-items:center;font-family:Arial,Helvetica,sans-serif;}
+	.spinner{height:50px;width:50px;border-radius:100%;border-left:10px solid rgba(255,255,255,.25);border-right:10px solid rgba(255,255,255,.25);border-bottom:10px solid rgba(255,255,255,.25);border-top:10px solid #fff;animation:rotation .8s linear infinite;}
+	@keyframes rotation{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+	/* download readout under the spinner */
+	#loadinfo{width:240px;margin-top:18px;text-align:center;}
+	#loadbar{height:4px;background:rgba(255,255,255,.18);border-radius:2px;overflow:hidden;}
+	#loadbarfill{height:100%;width:0;background:#fff;transition:width .15s linear;}
+	#loadtext{margin-top:9px;font-size:13px;color:#ddd;}
+	#loadfile{margin-top:4px;font-size:11px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+	</style>
+  </head>
+  <body ondrop="gotdrop(event);" ondragover="event.preventDefault()">
+	<figure id="spinner">
+		<div class="spinner"></div>
+		<div id="loadinfo">
+			<div id="loadbar"><div id="loadbarfill"></div></div>
+			<div id="loadtext">Loading&hellip;</div>
+			<div id="loadfile"></div>
+		</div>
+	</figure>
+	<div class="emscripten" id="status" style="display:none">Please allow/unblock our javascript to play.</div>
+	<div id="dropzone" ondrop="gotdrop(event);" ondragover="event.preventDefault()" hidden=1>Drop Zone</div>
+	<button type="button" onclick="begin()" id="begin" hidden=1>Click To Begin!</button>
+	<div class="emscripten" style="display:none">
+		<progress value="0" max="100" id="progress" hidden=1></progress>
+	</div>
+	<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" hidden=1></canvas>
+	<script type='text/javascript'>
+// connect to canvas
+var Module = {
+	setWindowTitle: function(){},   // keep our own page title; ignore engine updates
+	arguments: (function(){
+		// vid_hardwaregamma 2 = always-GLSL gamma (hardware gamma doesn't exist in
+		// WebGL, so without this the gamma cvar is a no-op and the screen stays dark).
+		var a = ["-manifest", "ftewebgl.html.fmf", "+set", "vid_hardwaregamma", "2", "+set", "gamma", "1.4"];
+		try {
+			var n = (new URLSearchParams(location.search).get('name') || (function(){try{return localStorage.getItem('surd_player_name')}catch(e){return ''}})() || '').replace(/[^A-Za-z0-9 _.\[\]\-]/g,'').trim().slice(0,15);
+			if (n) a = a.concat(["+set", "name", n]);
+		} catch(e){}
+		return a.concat(["+connect", "wss://q2.pieter.com"]);
+	})(),
+	files:
+	{	//these can be arraybuffers(you'll need a helper to define those) or promises(fte will block till they complete), or strings (which will be interpretted as urls and downloaded before any C code is run)
+		//note that the code below will skip the file-drop prompt if there's any files specified here (or there's a #foo.fmf file specified)
+//		"default.fmf": "default.fmf",
+//		"id1/pak0.pak": "pak0.pak",
+	},
+	print: function(msg)
+	{	//stdout...
+		console.log(msg);
+	},
+	printErr: function(text)
+	{	//stderr...
+		console.log(text);
+	},
+	canvas: document.getElementById('canvas'),	//for webgl to attach to
+	setStatus: function(text)
+	{	//gets spammed some prints during startup. blame emscripten.
+		if (Module.setStatus.interval)
+			clearInterval(Module.setStatus.interval);
+		var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+		var statusElement = document.getElementById('status');
+		var progressElement = document.getElementById('progress');
+		if (m) {
+			text = m[1];
+			progressElement.value = parseInt(m[2])*100;
+			progressElement.max = parseInt(m[4])*100;
+			progressElement.hidden = false;
+		} else {
+			progressElement.value = null;
+			progressElement.max = null;
+			progressElement.hidden = true;
+		}
+		statusElement.innerHTML = text;
+		statusElement.hidden = text.length==0;
+	},
+//	preRun: [],
+	totalDependencies: 0,
+	monitorRunDependencies: function(left)
+	{	//progress is progress...
+		this.totalDependencies = Math.max(this.totalDependencies, left);
+		Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+	},
+//	onRuntimeInitialized: function(){},
+	postRun:
+	[	//each of these are called after main was run. we should have our mainloop set up now
+		function(){ var sp=document.getElementById('spinner'); if(sp && !Module._loading) sp.style.display='none'; },
+		function()
+		{
+			if (Module["sched"] === undefined)
+			{	//our main function failed to set up the main loop. ie: main didn't get called. panic.
+				alert("Unable to initialise. You may need to restart your browser. If you get this often and inconsistently, consider using a 64bit browser instead.");
+				Module.setStatus("Initialisation Failure");
+			}
+		}
+	],
+};
+// Keep a loading spinner up while FTE downloads packages and loads the map.
+// The engine has already taken over the (black) canvas by the time it fetches
+// q2dm.pk3 / q2extras2.pk3, so without this it's a black screen on first load.
+// FTE emits "Downloading <pak>" / "Downloaded <pak>" (on stderr -> printErr),
+// so this is called from both print and printErr. We track in-flight files so
+// the spinner survives a slow/silent large pak, then hide it a few seconds
+// after output goes quiet (map finished loading -> actually rendering).
+function noteDownload(msg)
+{
+	try {
+		if (typeof msg !== 'string') return;
+		var m = /^(Downloading|Downloaded) (\S+)/.exec(msg);
+		if (m) {
+			Module._loading = true;
+			Module._dlActive = (Module._dlActive || 0) + (m[1] === 'Downloading' ? 1 : -1);
+			if (Module._dlActive < 0) Module._dlActive = 0;
+			var sp = document.getElementById('spinner'); if (sp) sp.style.display = '';
+			var el = document.getElementById('status');
+			if (el && m[1] === 'Downloading') {
+				el.style.display = ''; el.hidden = false;
+				el.innerHTML = 'Downloading game files… ' + m[2].replace(/^baseq2_/, '');
+			}
+		}
+		if (Module._loading) {
+			clearTimeout(Module._dlHideTimer);
+			if (!Module._dlActive) {   // only arm the hide once nothing is downloading
+				Module._dlHideTimer = setTimeout(function(){
+					Module._loading = false;
+					var sp = document.getElementById('spinner'); if (sp) sp.style.display = 'none';
+					var e = document.getElementById('status'); if (e) { e.style.display = 'none'; e.hidden = true; }
+				}, 4000);
+			}
+		}
+	} catch(e){}
+}
+// FTE's package-download lines reach the console via Emscripten's default
+// stdout (console.log inside ftewebgl2.js), NOT through Module.print/printErr,
+// so hook console here to drive the spinner. Installed before the engine loads.
+(function(){
+	['log','error'].forEach(function(fn){
+		var orig = console[fn] ? console[fn].bind(console) : function(){};
+		console[fn] = function(){
+			try {
+				for (var i = 0; i < arguments.length; i++) {
+					if (typeof arguments[i] === 'string' && /^(Downloading|Downloaded) /.test(arguments[i])) { noteDownload(arguments[i]); break; }
+				}
+			} catch(e){}
+			return orig.apply(console, arguments);
+		};
+	});
+})();
+// --- Byte-level download progress (the text under the spinner) ---
+// FTE fetches its packages through _emscriptenfte_async_wget_data2 -> XMLHttpRequest
+// (which fires real progress events), and Emscripten pulls the engine .wasm through
+// fetch()/instantiateStreaming. Hook both so we can report "23.4 / 81.2 MB · 29%"
+// instead of a bare spinner. Sizes below are the immutable assets in the manifest,
+// so the denominator is right from the first frame rather than growing as each
+// request starts. Anything unexpected we see just gets added to the total.
+(function(){
+	var EXPECT = {
+		'/ftewebgl2.wasm':                    6323928,
+		'/fteassets/baseq2/pak0.pak':        49951322,
+		'/fteassets/baseq2/q2extras2.pk3':   19510801,
+		'/fteassets/baseq2/q2dm.pk3':         5433237
+	};
+	var seen = {};        // path -> {loaded, total}
+	var current = '';     // basename of whatever moved most recently
+	var raf = 0;
+
+	function path(u){
+		try { return new URL(u, location.href).pathname; } catch(e){ return String(u||''); }
+	}
+	function want(p){ return /\.(wasm|pak|pk3|pk4|data)$/i.test(p); }
+	function mb(n){ return (n/1048576).toFixed(1); }
+
+	function track(p, loaded, total){
+		var e = seen[p] || (seen[p] = {loaded:0, total:0});
+		e.total  = Math.max(e.total, total||0, EXPECT[p]||0);
+		e.loaded = Math.max(e.loaded, loaded||0);
+		current = p.replace(/^.*\//, '');
+		// flag, not the rAF handle: the keepalive shim below returns 0 in hidden tabs
+		if (!raf) { raf = 1; requestAnimationFrame(function(){ raf = 0; render(); }); }
+	}
+
+	function render(){
+		var done = 0, all = 0, k;
+		for (k in EXPECT) if (!seen[k]) all += EXPECT[k];
+		for (k in seen) {
+			var t = seen[k].total || seen[k].loaded;
+			all  += t;
+			done += Math.min(seen[k].loaded, t);
+		}
+		if (!all) return;
+		var pct = Math.min(100, Math.round(done/all*100));
+		var bar = document.getElementById('loadbarfill');
+		var txt = document.getElementById('loadtext');
+		var fil = document.getElementById('loadfile');
+		if (bar) bar.style.width = pct + '%';
+		if (txt) txt.textContent = (pct >= 100 ? 'Loading map… ' : '')
+			+ mb(done) + ' / ' + mb(all) + ' MB · ' + pct + '%';
+		if (fil) fil.textContent = pct >= 100 ? '' : current;
+	}
+
+	// FTE's package downloads (and Emscripten's non-streaming wasm fallback).
+	var open = XMLHttpRequest.prototype.open, send = XMLHttpRequest.prototype.send;
+	XMLHttpRequest.prototype.open = function(m, u){
+		try { this.__p = path(u); } catch(e){}
+		return open.apply(this, arguments);
+	};
+	XMLHttpRequest.prototype.send = function(){
+		try {
+			var p = this.__p, self = this;
+			if (p && want(p)) {
+				this.addEventListener('progress', function(ev){
+					track(p, ev.loaded, ev.lengthComputable ? ev.total : 0);
+				});
+				this.addEventListener('load', function(){
+					var n = (self.response && self.response.byteLength)
+						|| (seen[p] && seen[p].total) || 0;
+					track(p, n, n);   // cache hits never fire progress; settle them here
+				});
+			}
+		} catch(e){}
+		return send.apply(this, arguments);
+	};
+
+	// The engine .wasm arrives via fetch + WebAssembly.instantiateStreaming, so count
+	// it by teeing the response body. Headers are carried over verbatim, otherwise the
+	// application/wasm content-type is lost and streaming instantiation refuses it.
+	var fetch0 = window.fetch;
+	if (fetch0 && window.ReadableStream) window.fetch = function(input){
+		var p = path(typeof input === 'string' ? input : (input && input.url) || '');
+		var r = fetch0.apply(this, arguments);
+		if (!want(p)) return r;
+		return r.then(function(res){
+			try {
+				if (!res.ok || !res.body) return res;
+				var total = parseInt(res.headers.get('content-length'), 10) || 0;
+				var reader = res.body.getReader(), loaded = 0;
+				return new Response(new ReadableStream({
+					pull: function(ctrl){
+						return reader.read().then(function(c){
+							if (c.done) { track(p, loaded, total || loaded); ctrl.close(); return; }
+							loaded += c.value.byteLength;
+							track(p, loaded, total);
+							ctrl.enqueue(c.value);
+						});
+					},
+					cancel: function(reason){ try { reader.cancel(reason); } catch(e){} }
+				}), {status:res.status, statusText:res.statusText, headers:res.headers});
+			} catch(e){ return res; }
+		});
+	};
+
+	render();
+})();
+function begin()
+{
+	if (Module.began)
+		return;
+	// Automated browsers (headless crawlers, Playwright/Selenium, etc. all set
+	// navigator.webdriver) must not load the engine and join the live server.
+	
+	// Phones/tablets are allowed: /assets/touch-controls.js (shared pieter.com touch layout) gives them
+	// a joystick, drag-to-look and shoot/jump buttons (2026-10-07; this used to show "Desktop required").
+	Module.began = true;
+	document.getElementById('dropzone').hidden = true;
+	document.getElementById('begin').hidden = true;
+	Module.setStatus('Downloading...');
+
+	// make a script. do it the hard way for the error.
+	var s = document.createElement('script');
+	// set it up
+	s.setAttribute('src',"ftewebgl2.js");
+	s.setAttribute('type',"text/javascript");
+	s.setAttribute('charset',"utf-8");
+	s.addEventListener('error', function() {alert("Oh noes! we got an error!"); Module.setStatus("Unable to download engine javascript");}, false);
+	// add to DOM
+	document.head.appendChild(s);
+}
+
+//stuff to facilitate our drag+drop filesystem support
+function fixupfilepath(fname, path)
+{	//we just have a filename, try to guess where to put it.
+	if (path != "")
+		return path+fname;	//already has a path. use it. this allows people to drag+drop gamedirs.
+	var ext = fname.substr(fname.lastIndexOf('.') + 1);
+	if (ext == 'fmf' || ext == 'kpf')	//these are the only files that really make sense in the root.
+		return fname;
+	if (ext == 'bsp' || ext == 'map' || ext == 'lit' || ext == 'lux')
+		return "id1/maps/" + fname;	//bsps get their own extra subdir
+	return "id1/" + fname;	//probably a pak. maybe a cfg, no idea really.
+}
+function showfiles()
+{	//print the pending file list in some pretty way
+	if (Module.began)
+		return;
+	Module.setStatus('');
+	document.getElementById('dropzone').hidden = false;
+	document.getElementById('begin').hidden = false;
+	var nt = "Drag gamedirs or individual package files here to make them available!<br/>Active Files:<br/><pre>";
+	var keys = Object.keys(Module.files);
+	for(var i = 0; i < keys.length; i++)
+	{
+		if (Module.files[keys[i]] instanceof ArrayBuffer)
+		{
+			var sz = Module.files[keys[i]].byteLength;
+			if (sz > 512*1024)
+				sz = (sz / (1024*1024)) + "mb";
+			else if (sz > 512)
+				sz = (sz / 1024) + "kb";
+			else
+				sz = (sz) + " bytes";
+			nt += "    " + keys[i] + " ("+sz+")<br/>";
+		}
+		else
+			nt += "    " + keys[i] + "<br/>";
+	}
+	nt += "</pre>("+keys.length+" files)";
+	document.getElementById('dropzone').innerHTML = nt;
+}
+function scanfiles(item,path)
+{	//for directory drops
+	if (item.isFile)
+	{
+		item.file(function(f)
+		{
+			let n = fixupfilepath(f.name, path);
+			Module.files[n]=f.arrayBuffer();	//actually a promise...
+			Module.files[n].then(buf=>{Module.files[n]=buf;showfiles();});	//try and resolve it now.
+    	});
+	}
+	else if (item.isDirectory)
+	{
+		// Get folder contents
+		var dirReader = item.createReader();
+		dirReader.readEntries(function(entries)
+		{
+			for (var i=0; i<entries.length; i++)
+				scanfiles(entries[i], path + item.name + "/");
+		});
+	}
+}
+function gotdrop(ev)
+{	//user drag+dropped something. 
+	ev.preventDefault();
+	for (var i = 0; i < ev.dataTransfer.items.length; i++)
+		if (ev.dataTransfer.items[i].webkitGetAsEntry)
+		{
+			var d = ev.dataTransfer.items[i].webkitGetAsEntry();
+			if (d)
+				scanfiles(d, "");
+		}
+		else if (ev.dataTransfer.items[i].kind === 'file')
+		{
+			var f = ev.dataTransfer.items[i].getAsFile();
+			var n = fixupfilepath(f.name);
+			Module.files[n]=f.arrayBuffer();	//actually a promise...
+			Module.files[n].then(buf=>{Module.files[n]=buf;showfiles();});	//try and resolve it now.
+		}
+	showfiles();
+}
+// Hide the loading spinner as soon as the engine takes over the canvas
+// (backstop to postRun, in case the canvas is shown before main returns).
+(function(){
+	var cv=document.getElementById('canvas'), sp=document.getElementById('spinner');
+	if(!cv||!sp) return;
+	function chk(){ try{ if(!Module._loading && !cv.hidden && getComputedStyle(cv).display!=='none'){ sp.style.display='none'; } }catch(e){} }
+	new MutationObserver(chk).observe(cv,{attributes:true,attributeFilter:['hidden','style','class','width','height']});
+})();
+// --- Background-tab keepalive ---
+// Browsers pause requestAnimationFrame in hidden tabs, so the engine main loop
+// stops stepping -> it stops sending netchan packets -> the server times us out
+// and we return to a dead/disconnected connection. Drive the engine's rAF
+// callbacks from a Web Worker tick while hidden so a keepalive packet keeps
+// flowing and the slot stays alive. When visible, the real rAF is used unchanged.
+(function(){
+  var realRAF = window.requestAnimationFrame
+        ? window.requestAnimationFrame.bind(window)
+        : function(cb){ return setTimeout(function(){ cb(performance.now()); }, 16); };
+  var realCAF = window.cancelAnimationFrame ? window.cancelAnimationFrame.bind(window) : clearTimeout;
+  var pend = [], worker = null;
+  function run(rec){
+    if (rec.done) return;
+    rec.done = true;
+    var i = pend.indexOf(rec); if (i >= 0) pend.splice(i, 1);
+    try { rec.cb(performance.now()); } catch(e){}
+  }
+  function fireAll(){
+    if (!document.hidden) return;
+    var cur = pend.slice();
+    for (var i = 0; i < cur.length; i++) run(cur[i]);
+  }
+  try {
+    worker = new Worker(URL.createObjectURL(new Blob(
+      ["setInterval(function(){postMessage(0)},100)"], {type:'text/javascript'})));
+    worker.onmessage = fireAll;
+  } catch(e){}
+  function bgPump(){ if (document.hidden && !worker){ fireAll(); setTimeout(bgPump, 200); } }
+  window.requestAnimationFrame = function(cb){
+    var rec = { cb: cb, done: false, id: 0 };
+    pend.push(rec);
+    if (!document.hidden) rec.id = realRAF(function(){ run(rec); });
+    return rec.id;
+  };
+  window.cancelAnimationFrame = function(id){
+    if (id) for (var i = 0; i < pend.length; i++) if (pend[i].id === id){ pend[i].done = true; pend.splice(i, 1); break; }
+    try { realCAF(id); } catch(e){}
+  };
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden){ fireAll(); bgPump(); }
+    else pend.slice().forEach(function(rec){ if (!rec.done && !rec.id) rec.id = realRAF(function(){ run(rec); }); });
+  });
+})();
+
+// --- Mute audio while the tab is hidden ---
+// Capture every AudioContext the engine creates and suspend it while the tab is
+// hidden (resume on return), so the game goes silent when you switch away.
+(function(){
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  var ctxs = [];
+  function Wrapped(opts){
+    var c = new AC(opts);
+    ctxs.push(c);
+    if (document.hidden) { try { c.suspend(); } catch(e){} }
+    return c;
+  }
+  Wrapped.prototype = AC.prototype;
+  window.AudioContext = Wrapped;
+  if (window.webkitAudioContext) window.webkitAudioContext = Wrapped;
+  document.addEventListener('visibilitychange', function(){
+    for (var i = 0; i < ctxs.length; i++) {
+      try { document.hidden ? ctxs[i].suspend() : ctxs[i].resume(); } catch(e){}
+    }
+  });
+})();
+
+// Auto-start: the manifest defaults to ftewebgl.html.fmf (in this dir), so no
+// hash and no click needed. Drag-drop dropper is bypassed.
+begin();
+    </script>      
+  <script>(function(){var c=document.getElementById('canvas'),d=new Set();addEventListener('keydown',function(e){d.add(e.code||e.keyCode)},true);addEventListener('keyup',function(e){d.delete(e.code||e.keyCode)},true);function r(){var T=[c,document,window].filter(Boolean);d.forEach(function(k){T.forEach(function(t){try{var i=(typeof k=='string')?{code:k,key:k,bubbles:true,cancelable:true}:{keyCode:k,which:k,bubbles:true,cancelable:true};t.dispatchEvent(new KeyboardEvent('keyup',i))}catch(_){}})});d.clear();[0,1,2].forEach(function(b){try{c&&c.dispatchEvent(new MouseEvent('mouseup',{button:b,bubbles:true,cancelable:true}))}catch(_){}});try{if(document.pointerLockElement)document.exitPointerLock()}catch(_){}}addEventListener('blur',r);document.addEventListener('visibilitychange',function(){if(document.hidden)r()})})();</script>
+<!-- Alt+Enter fullscreen: opt-in via keypress, never auto-fullscreens. Handled at the DOM level inside the real user gesture. -->
+<style>#canvas:fullscreen,#canvas:-webkit-full-screen{width:100vw!important;height:100vh!important;object-fit:contain}</style>
+<script>(function(){function cur(){return document.fullscreenElement||document.webkitFullscreenElement}function exit(){var x=document.exitFullscreen||document.webkitExitFullscreen;if(x)try{x.call(document)}catch(e){}}function enter(el){if(!el)return;var r=el.requestFullscreen||el.webkitRequestFullscreen;if(!r)return;try{var p=r.call(el);if(p&&p.catch)p.catch(function(e){console.warn('fullscreen blocked',e)})}catch(e){console.warn('fullscreen blocked',e)}}addEventListener('keydown',function(e){if(e.altKey&&(e.code==='Enter'||e.key==='Enter'||e.keyCode===13)){e.preventDefault();e.stopImmediatePropagation();if(cur())exit();else enter(document.getElementById('canvas'))}},true)})();</script>
+
+<script crossorigin="anonymous" src="assets/touch-controls.js"></script><script>PieterTouch.autoStart({layout:"classic"})</script></body>
+</html>
